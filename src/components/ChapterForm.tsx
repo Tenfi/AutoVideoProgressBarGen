@@ -1,97 +1,93 @@
 import React from 'react'
 import { Form, Input, InputNumber, Button, Space } from 'antd'
-import { Chapter } from '../types'
-import { MAX_CHAPTER_TITLE_LENGTH, MIN_DURATION, MAX_DURATION } from '../utils/constants'
+import { Chapter } from '../types/chapter'
+import styled from 'styled-components'
+
+const FormContainer = styled.div`
+  margin-bottom: 24px;
+`
 
 interface ChapterFormProps {
   onSubmit: (chapter: Omit<Chapter, 'id'>) => void
-  initialValues?: Omit<Chapter, 'id'>
+  initialValues?: Chapter
   totalDuration: number
+  previousEndTime?: number
 }
 
 export const ChapterForm: React.FC<ChapterFormProps> = ({
   onSubmit,
   initialValues,
-  totalDuration
+  totalDuration,
+  previousEndTime = 0
 }) => {
   const [form] = Form.useForm()
 
-  const handleSubmit = (values: Omit<Chapter, 'id'>) => {
-    onSubmit(values)
-    if (!initialValues) {
-      form.resetFields()
-    }
+  const handleSubmit = (values: { title: string; endTime: number }) => {
+    onSubmit({
+      title: values.title,
+      endTime: values.endTime
+    })
+    form.resetFields()
   }
 
   return (
-    <Form
-      form={form}
-      layout="vertical"
-      onFinish={handleSubmit}
-      initialValues={initialValues}
-    >
-      <Form.Item
-        name="title"
-        label="章节标题"
-        rules={[
-          { required: true, message: '请输入章节标题' },
-          { max: MAX_CHAPTER_TITLE_LENGTH, message: `标题最多${MAX_CHAPTER_TITLE_LENGTH}个字符` }
-        ]}
+    <FormContainer>
+      <Form
+        form={form}
+        onFinish={handleSubmit}
+        initialValues={initialValues}
+        layout="inline"
       >
-        <Input placeholder="请输入章节标题" />
-      </Form.Item>
-
-      <Space>
         <Form.Item
-          name="startTime"
-          label="开始时间（分钟）"
+          name="title"
           rules={[
-            { required: true, message: '请输入开始时间' },
-            { type: 'number', min: 0, max: totalDuration, message: `时间必须在0-${totalDuration}分钟之间` }
+            { required: true, message: '请输入章节标题' },
+            { max: 20, message: '标题最多20个字符' }
           ]}
+          style={{ flex: 1 }}
         >
-          <InputNumber
-            min={MIN_DURATION}
-            max={MAX_DURATION}
-            step={0.1}
-            precision={1}
-            placeholder="开始时间"
-            style={{ width: 120 }}
-          />
+          <Input placeholder="请输入章节标题" maxLength={20} />
         </Form.Item>
 
         <Form.Item
           name="endTime"
-          label="结束时间（分钟）"
           rules={[
             { required: true, message: '请输入结束时间' },
-            { type: 'number', min: 0, max: totalDuration, message: `时间必须在0-${totalDuration}分钟之间` },
-            ({ getFieldValue }) => ({
-              validator(_, value) {
-                if (!value || getFieldValue('startTime') < value) {
-                  return Promise.resolve()
-                }
-                return Promise.reject(new Error('结束时间必须大于开始时间'))
-              }
-            })
+            {
+              type: 'number',
+              min: previousEndTime,
+              message: `结束时间必须大于 ${previousEndTime.toFixed(1)}`
+            },
+            {
+              type: 'number',
+              max: totalDuration,
+              message: `结束时间不能超过总时长 ${totalDuration.toFixed(1)}`
+            }
           ]}
         >
           <InputNumber
-            min={MIN_DURATION}
-            max={MAX_DURATION}
+            placeholder="结束时间"
             step={0.1}
             precision={1}
-            placeholder="结束时间"
-            style={{ width: 120 }}
+            min={previousEndTime}
+            max={totalDuration}
+            addonAfter="分钟"
           />
         </Form.Item>
-      </Space>
 
-      <Form.Item>
-        <Button type="primary" htmlType="submit">
-          {initialValues ? '更新章节' : '添加章节'}
-        </Button>
-      </Form.Item>
-    </Form>
+        <Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit">
+              {initialValues ? '更新章节' : '添加章节'}
+            </Button>
+            {initialValues && (
+              <Button onClick={() => form.resetFields()}>
+                取消
+              </Button>
+            )}
+          </Space>
+        </Form.Item>
+      </Form>
+    </FormContainer>
   )
 } 
