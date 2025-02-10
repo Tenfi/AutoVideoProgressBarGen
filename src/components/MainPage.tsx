@@ -1,12 +1,15 @@
 import React, { useState } from 'react'
-import { Card, InputNumber, Alert, Button, Space, message } from 'antd'
+import { Card, InputNumber, Alert, Button, Space, message, Progress } from 'antd'
 import styled from 'styled-components'
 import { useChapters } from '../hooks/useChapters'
 import { ChapterForm } from './ChapterForm'
 import { ChapterList } from './ChapterList'
 import { ProgressBarPreview } from './ProgressBarPreview'
-import { Chapter } from '../types'
-import { MIN_DURATION, MAX_DURATION } from '../utils/constants'
+import { StyleSettings } from './StyleSettings'
+import { Chapter, ProgressBarStyle } from '../types'
+import { MIN_DURATION, MAX_DURATION, DEFAULT_PROGRESS_BAR_STYLE } from '../utils/constants'
+import { generateVideo } from '../utils/videoGenerator'
+import { generateFileName } from '../utils/helpers'
 
 const Container = styled.div`
   max-width: 1200px;
@@ -22,6 +25,9 @@ export const MainPage: React.FC = () => {
   const [totalDuration, setTotalDuration] = useState<number>(5)
   const [currentTime, setCurrentTime] = useState<number>(0)
   const [editingChapter, setEditingChapter] = useState<Chapter | null>(null)
+  const [style, setStyle] = useState<ProgressBarStyle>(DEFAULT_PROGRESS_BAR_STYLE)
+  const [generating, setGenerating] = useState(false)
+  const [progress, setProgress] = useState(0)
 
   const {
     chapters,
@@ -55,9 +61,39 @@ export const MainPage: React.FC = () => {
     removeChapter(id)
   }
 
-  const handleGenerateVideo = () => {
-    // TODO: 实现视频生成功能
-    message.info('视频生成功能即将推出')
+  const handleStyleChange = (newStyle: ProgressBarStyle) => {
+    setStyle(newStyle)
+  }
+
+  const handleGenerateVideo = async () => {
+    try {
+      setGenerating(true)
+      setProgress(0)
+
+      const blob = await generateVideo({
+        chapters,
+        totalDuration,
+        style,
+        onProgress: setProgress
+      })
+
+      // 创建下载链接
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = generateFileName()
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      message.success('视频生成成功！')
+    } catch (error) {
+      message.error('视频生成失败：' + (error as Error).message)
+    } finally {
+      setGenerating(false)
+      setProgress(0)
+    }
   }
 
   return (
@@ -100,6 +136,10 @@ export const MainPage: React.FC = () => {
         />
       </StyledCard>
 
+      <StyledCard title="样式设置">
+        <StyleSettings style={style} onChange={handleStyleChange} />
+      </StyledCard>
+
       <StyledCard title="预览">
         <Space direction="vertical" style={{ width: '100%' }}>
           <div>
@@ -117,9 +157,18 @@ export const MainPage: React.FC = () => {
             chapters={chapters}
             totalDuration={totalDuration}
             currentTime={currentTime}
+            style={style}
           />
-          <Button type="primary" onClick={handleGenerateVideo} disabled={chapters.length === 0}>
-            生成视频
+          {generating && (
+            <Progress percent={Math.round(progress * 100)} status="active" />
+          )}
+          <Button
+            type="primary"
+            onClick={handleGenerateVideo}
+            disabled={chapters.length === 0 || generating}
+            loading={generating}
+          >
+            {generating ? '生成中...' : '生成视频'}
           </Button>
         </Space>
       </StyledCard>
