@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { Card, InputNumber, Alert, Button, Space, message } from 'antd'
+import { Card, InputNumber, Alert, Space } from 'antd'
 import styled from 'styled-components'
 import { useChapters } from '../hooks/useChapters'
 import { ChapterForm } from './ChapterForm'
 import { ChapterList } from './ChapterList'
 import { ProgressBarPreview } from './ProgressBarPreview'
-import { Chapter } from '../types'
+import { Chapter } from '../types/chapter'
 import { MIN_DURATION, MAX_DURATION } from '../utils/constants'
+import { VideoGenerator } from './VideoGenerator'
 
 const Container = styled.div`
   max-width: 1200px;
@@ -40,8 +41,9 @@ export const MainPage: React.FC = () => {
 
   const handleChapterSubmit = (chapter: Omit<Chapter, 'id'>) => {
     if (editingChapter) {
-      updateChapter(editingChapter.id, chapter)
-      setEditingChapter(null)
+      if (updateChapter(editingChapter.id, chapter)) {
+        setEditingChapter(null)
+      }
     } else {
       addChapter(chapter)
     }
@@ -53,11 +55,28 @@ export const MainPage: React.FC = () => {
 
   const handleDeleteChapter = (id: string) => {
     removeChapter(id)
+    if (editingChapter?.id === id) {
+      setEditingChapter(null)
+    }
   }
 
-  const handleGenerateVideo = () => {
-    // TODO: 实现视频生成功能
-    message.info('视频生成功能即将推出')
+  const getPreviousEndTime = () => {
+    if (!editingChapter) {
+      return chapters.length > 0 ? chapters[chapters.length - 1].endTime : 0
+    }
+    const index = chapters.findIndex(c => c.id === editingChapter.id)
+    return index > 0 ? chapters[index - 1].endTime : 0
+  }
+
+  const getVideoChapters = () => {
+    return chapters.map((chapter, index) => {
+      const startTime = index === 0 ? 0 : chapters[index - 1].endTime;
+      return {
+        title: chapter.title,
+        startTime: startTime * 60, // 转换为秒
+        endTime: chapter.endTime * 60 // 转换为秒
+      };
+    });
   }
 
   return (
@@ -92,11 +111,13 @@ export const MainPage: React.FC = () => {
           onSubmit={handleChapterSubmit}
           initialValues={editingChapter || undefined}
           totalDuration={totalDuration}
+          previousEndTime={getPreviousEndTime()}
         />
         <ChapterList
           chapters={chapters}
           onEdit={handleEditChapter}
           onDelete={handleDeleteChapter}
+          totalDuration={totalDuration}
         />
       </StyledCard>
 
@@ -114,13 +135,14 @@ export const MainPage: React.FC = () => {
             />
           </div>
           <ProgressBarPreview
-            chapters={chapters}
+            chapters={getVideoChapters()}
             totalDuration={totalDuration}
             currentTime={currentTime}
           />
-          <Button type="primary" onClick={handleGenerateVideo} disabled={chapters.length === 0}>
-            生成视频
-          </Button>
+          <VideoGenerator
+            totalDuration={Math.round(totalDuration * 60)}
+            chapters={getVideoChapters()}
+          />
         </Space>
       </StyledCard>
     </Container>
